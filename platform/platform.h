@@ -7,6 +7,7 @@
 #include <time.h>
 
 #define HAVE_STRUCT_TIMESPEC
+#define sigset_t _sigset_t
 
 /*<signal.h>*/
 #define	SIGHUP	1
@@ -25,6 +26,9 @@ int sigaction(int sig, const struct sigaction *act, struct sigaction *oact);
 
 char *strsep(char **stringp, const char *delim);
 
+#undef CLOCK_THREAD_CPUTIME_ID
+#undef CLOCK_REALTIME
+#undef CLOCK_MONOTONIC
 enum { CLOCK_THREAD_CPUTIME_ID, CLOCK_REALTIME, CLOCK_MONOTONIC };
 #define clock_gettime clock_gettime_platform
 int clock_gettime_platform(int what, struct timespec *ti);
