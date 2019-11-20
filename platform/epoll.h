@@ -1,108 +1,113 @@
-#ifndef EPOLL_H
-#define EPOLL_H
+/*
+ * wepoll - epoll for Windows
+ * https://github.com/piscisaureus/wepoll
+ *
+ * Copyright 2012-2019, Bert Belder <bertbelder@gmail.com>
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *
+ *   * Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer in the
+ *     documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
-/* At this time, epoll on Windows only supports socket descriptors,
-   not file descriptors, *and not epoll descriptors*.
-   This differs from epoll's behavior of allowing any fd. */
+#ifndef WEPOLL_H_
+#define WEPOLL_H_
+
+#ifndef WEPOLL_EXPORT
+#define WEPOLL_EXPORT
+#endif
+
+#include <stdint.h>
 
 enum EPOLL_EVENTS {
-    EPOLLIN      = 0x0001,
-    EPOLLOUT     = 0x0002,
-    EPOLLRDHUP   = 0x0004,
-    EPOLLPRI     = 0x0008,
-    EPOLLERR     = 0x0010,
-    EPOLLHUP     = 0x0020,
-    EPOLLET      = 0x0040,
-    EPOLLONESHOT = 0x0080
+  EPOLLIN      = (int) (1U <<  0),
+  EPOLLPRI     = (int) (1U <<  1),
+  EPOLLOUT     = (int) (1U <<  2),
+  EPOLLERR     = (int) (1U <<  3),
+  EPOLLHUP     = (int) (1U <<  4),
+  EPOLLRDNORM  = (int) (1U <<  6),
+  EPOLLRDBAND  = (int) (1U <<  7),
+  EPOLLWRNORM  = (int) (1U <<  8),
+  EPOLLWRBAND  = (int) (1U <<  9),
+  EPOLLMSG     = (int) (1U << 10), /* Never reported. */
+  EPOLLRDHUP   = (int) (1U << 13),
+  EPOLLONESHOT = (int) (1U << 31)
 };
 
-enum EPOLL_OPCODES {
-    EPOLL_CTL_ADD,
-    EPOLL_CTL_DEL,
-    EPOLL_CTL_MOD
-};
+#define EPOLLIN      (1U <<  0)
+#define EPOLLPRI     (1U <<  1)
+#define EPOLLOUT     (1U <<  2)
+#define EPOLLERR     (1U <<  3)
+#define EPOLLHUP     (1U <<  4)
+#define EPOLLRDNORM  (1U <<  6)
+#define EPOLLRDBAND  (1U <<  7)
+#define EPOLLWRNORM  (1U <<  8)
+#define EPOLLWRBAND  (1U <<  9)
+#define EPOLLMSG     (1U << 10)
+#define EPOLLRDHUP   (1U << 13)
+#define EPOLLONESHOT (1U << 31)
+
+#define EPOLL_CTL_ADD 1
+#define EPOLL_CTL_MOD 2
+#define EPOLL_CTL_DEL 3
+
+typedef void* HANDLE;
+typedef uintptr_t SOCKET;
 
 typedef union epoll_data {
-    void* ptr;
-    int fd;
-    unsigned int u32;
-    unsigned long long u64;
+  void* ptr;
+  int fd;
+  uint32_t u32;
+  uint64_t u64;
+  SOCKET sock; /* Windows specific */
+  HANDLE hnd;  /* Windows specific */
 } epoll_data_t;
 
 struct epoll_event {
-    unsigned int events;
-    epoll_data_t data;
+  uint32_t events;   /* Epoll events and flags */
+  epoll_data_t data; /* User data variable */
 };
 
-/*
-Function:    int epoll_startup()
-Description: This function does necessary initialization for the epoll library.
-             While this equates to a noop in Linux, in Windows it does not.
-             Applications should call this function exactly once on startup.
-             The epoll library should not be used if startup fails!
-Parameters:  None
-Returns:     0 if startup was successful, nonzero otherwise
-*/
-int epoll_startup();
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-/*
-Function:    int epoll_create(int size)
-Description: The size is a hint to the kernel regarding the size of the event backing store.
-             epoll_create returns a file descriptor for use with epoll.
-             This file descriptor must be closed with epoll_close.
-Returns:     When successful, returns a non-negative integer identifying the descriptor.
-             When an error occurs, returns -1 and errno is set appropriately.
-Errors:
-             CINVAL
-                 size is not positive.
-             CNFILE
-                 The system limit on the total number of open files has been reached.
-             CNOMEM
-                 There was insufficient memory to create the kernel object.
-*/
-int epoll_create(int size);
+WEPOLL_EXPORT HANDLE epoll_create(int size);
+WEPOLL_EXPORT HANDLE epoll_create1(int flags);
 
-/*
-Function:    int epoll_ctl(int epfd, int opcode, int fd, struct epoll_event* event)
-Description: Control a epoll descriptor, epfd, by requesting that the operation opcode
-               be performed on the target file descriptor, fd. The event describes the
-               object linked to the file descriptor fd.
-             Returns zero on success, or -1 on error.
-*/
-int epoll_ctl(int epfd, int opcode, int fd, struct epoll_event* event);
+WEPOLL_EXPORT int epoll_close(HANDLE ephnd);
 
-/*
-Function:    int epoll_wait(int epfd, struct epoll_event* events, int maxevents, int timeout)
-Description: Wait for events on the epoll file descriptor epfd for a maximum time of timeout
-               milliseconds. The memory area pointed to by events will contain the events that
-               will be available for the caller. Up to maxevents are returned. The maxevents
-               parameter must be greater than zero. Specifying a timeout of -1 makes epoll_wait
-               wait indefinitely, while specifying a timeout equal to zero makes epoll_wait
-               return immediately even if no events are available.
-             Returns the number of file descriptors ready for the requested I/O, zero if
-               no file descriptor became ready before the requested timeout, or -1 on error.
-*/
-int epoll_wait(int epfd, struct epoll_event* events, int maxevents, int timeout);
+WEPOLL_EXPORT int epoll_ctl(HANDLE ephnd,
+                            int op,
+                            SOCKET sock,
+                            struct epoll_event* event);
 
-/*
-Function:    int epoll_close(int epfd)
-Description: Takes a epoll file descriptor to close.
-             Returns zero on success, or nonzero on error.
-             Failure to close a epoll file descriptor may result in memory leaks
-               and/or loss of data.
-             While in Linux epoll_close() is equivalent to close(), in Windows it is not.
-               To maintain portability, epoll_close must always be used for anything created
-               with epoll_create.
-*/
-int epoll_close(int epfd);
+WEPOLL_EXPORT int epoll_wait(HANDLE ephnd,
+                             struct epoll_event* events,
+                             int maxevents,
+                             int timeout);
 
-/*
-Function:    void epoll_cleanup()
-Description: This function does necessary cleanup for the epoll library.
-             While this equates to a noop in Linux, in Windows it does not.
-             Applications should call this function exactly once before closing.
-*/
-void epoll_cleanup();
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
-#endif /* EPOLL_H */
-
+#endif /* WEPOLL_H_ */
