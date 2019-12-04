@@ -26,6 +26,7 @@ THE SOFTWARE.
 #include <errno.h>
 #include <fcntl.h>
 #include "epoll.h"
+#include <stdarg.h>
 
 #define IN6ADDRSZ 16 
 #define INT16SZ 2
@@ -148,4 +149,9 @@ int fcntl(int fd, int cmd, long arg) {
   }
   
   return 1;
+}
+
+int myvsnprintf(char * s, size_t maxlen, const char *format, va_list arg) {
+  int r = vsnprintf(s, maxlen, format, arg);
+  return r == -1 ? maxlen : r;
 }

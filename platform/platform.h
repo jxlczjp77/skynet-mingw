@@ -100,4 +100,6 @@ int recvfrom_extend_voidptr(SOCKET s, void* buf, int len, int flags, struct sock
 
 __declspec(dllimport) int __stdcall gethostname(char *buffer, int len);
 
+int myvsnprintf(char * s, size_t maxlen, const char *format, va_list arg);
+
 #endif
